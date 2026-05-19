@@ -508,6 +508,7 @@ function migrateState() {
     creditLineRate: 0,
     fintocAccountId: "",
     fintocLinkId: "",
+    fintocLinkToken: "",
     lastFintocSync: null,
     ...account
   }));
@@ -1289,6 +1290,10 @@ function renderAccounts() {
         <span>Equivalente CLP</span>
         <span>${money.format(toClp(account.balance, account.currency || "CLP"))}</span>
       </div>
+      <div class="card-row">
+        <span>Fintoc</span>
+        <span>${account.fintocAccountId || account.fintocLinkToken ? "Configurado" : "Pendiente"}</span>
+      </div>
     </button>
   `).join("");
 
@@ -1410,6 +1415,7 @@ function renderAccountDetail() {
       <div class="mini-metric"><span>Movimientos</span><strong>${movements.length}</strong></div>
       <div class="mini-metric"><span>Conciliados</span><strong>${movements.filter((item) => item.matchedTo).length}</strong></div>
       <div class="mini-metric"><span>Fintoc</span><strong>${account.fintocAccountId ? "Conectada" : "Sin link"}</strong></div>
+      <div class="mini-metric"><span>Token cuenta</span><strong>${account.fintocLinkToken ? "Guardado" : "-"}</strong></div>
       <div class="mini-metric"><span>Ultima descarga</span><strong>${account.lastFintocSync ? new Date(account.lastFintocSync).toLocaleString("es-CL") : "-"}</strong></div>
     </div>
     <div class="table-wrap">
@@ -2020,6 +2026,9 @@ function bindForms() {
       balance: Number($("#accountBalance").value || 0),
       creditLineLimit: Number($("#accountCreditLineLimit").value || 0),
       creditLineRate: Number($("#accountCreditLineRate").value || 0),
+      fintocLinkToken: $("#accountFintocLinkToken").value.trim(),
+      fintocAccountId: $("#accountFintocAccountId").value.trim(),
+      fintocLinkId: "",
       movements: []
     });
     await saveState("Cuenta agregada.");
@@ -2567,7 +2576,23 @@ async function syncIndicators() {
     render();
     showNotice("Indicadores actualizados.");
   } catch (error) {
-    showNotice(error.message);
+    try {
+      const response = await fetch("https://mindicador.cl/api", { headers: { "Accept": "application/json" } });
+      if (!response.ok) throw new Error(error.message);
+      const data = await response.json();
+      state.settings.economicIndicators = {
+        uf: Number(data.uf?.valor || 0),
+        usd: Number(data.dolar?.valor || 0),
+        eur: Number(data.euro?.valor || 0),
+        utm: Number(data.utm?.valor || 0),
+        source: "mindicador.cl",
+        updatedAt: new Date().toISOString()
+      };
+      addLog("Indicadores economicos actualizados desde internet.");
+      await saveState("Indicadores actualizados.");
+    } catch (fallbackError) {
+      showNotice(fallbackError.message);
+    }
   }
 }
 

@@ -446,6 +446,26 @@ async function listFintocInvoices(linkToken, issueType, since, until) {
   return invoices;
 }
 
+function bankSyncSources(state) {
+  const byKey = new Map();
+  for (const link of ensureFintocSettings(state).filter((item) => item.product === "movements" && item.linkToken)) {
+    byKey.set(`link:${link.linkToken}`, { ...link, source: "company-link" });
+  }
+  for (const account of state.bankAccounts || []) {
+    if (!account.fintocLinkToken) continue;
+    byKey.set(`account:${account.id}`, {
+      id: account.fintocLinkId || account.fintocLinkToken,
+      product: "movements",
+      linkToken: account.fintocLinkToken,
+      accountId: account.fintocAccountId || "",
+      accountLocalId: account.id,
+      institutionName: account.bank || "Banco",
+      source: "account"
+    });
+  }
+  return Array.from(byKey.values());
+}
+
 function upsertDocumentsFromFintoc(state, documents, direction) {
   const target = direction === "sales" ? state.documents.sales : state.documents.purchases;
   const existing = new Set(target.map((doc) => doc.fintocInvoiceId || documentKey(doc)));
@@ -647,22 +667,26 @@ async function handleApi(req, res, url) {
 
   if (req.method === "POST" && url.pathname === "/api/bank/sync") {
     const state = await readState();
-    const links = ensureFintocSettings(state).filter((link) => link.product === "movements" && link.linkToken);
+    const links = bankSyncSources(state);
     if (process.env.FINTOC_SECRET_KEY && process.env.FINTOC_PUBLIC_KEY && links.length) {
       let newMovements = 0;
       const mfa = [];
       for (const link of links) {
         const refresh = await createRefreshIntent(link.linkToken);
         if (refresh?.requires_mfa?.widget_token) mfa.push({ linkId: link.id, widgetToken: refresh.requires_mfa.widget_token });
-        const accounts = await listFintocAccounts(link.linkToken);
+        const accounts = link.accountId
+          ? [{ id: link.accountId, name: link.institutionName, institution: { name: link.institutionName } }]
+          : await listFintocAccounts(link.linkToken);
         for (const fintocAccount of accounts) {
           const normalized = normalizeFintocAccount(fintocAccount, link);
-          let account = (state.bankAccounts || []).find((item) => item.fintocAccountId === normalized.fintocAccountId);
+          let account = (state.bankAccounts || []).find((item) =>
+            item.id === link.accountLocalId || item.fintocAccountId === normalized.fintocAccountId
+          );
           if (!account) {
-            account = { id: safeId("bank"), movements: [], creditLineLimit: 0, creditLineRate: 0, ...normalized };
+            account = { id: safeId("bank"), movements: [], creditLineLimit: 0, creditLineRate: 0, ...normalized, fintocLinkToken: link.linkToken };
             state.bankAccounts.push(account);
           } else {
-            Object.assign(account, normalized);
+            Object.assign(account, normalized, { fintocLinkToken: account.fintocLinkToken || link.linkToken });
           }
           const latestDate = (account.movements || []).map((item) => item.date).filter(Boolean).sort().at(-1);
           const movements = await listFintocMovements(fintocAccount.id, link.linkToken, latestDate);

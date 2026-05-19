@@ -16,9 +16,11 @@ La clave secreta no debe ir al frontend ni a GitHub. Por eso `.env` esta en `.gi
 ## Flujo esperado
 
 - En el dashboard, `Conectar banco` abre el widget de Fintoc para la empresa seleccionada.
+- En cada cuenta bancaria tambien se puede guardar manualmente `Fintoc link token` y `Fintoc account id`.
 - La primera vez se ingresan las credenciales del banco.
 - La app guarda el `link_token` en el archivo local `data/app-data.json`, que no se sube al repositorio.
 - Luego, `Actualizar todo` descarga movimientos bancarios y documentos SII conectados.
+- La rutina diaria ejecuta la misma descarga automatica cuando existan claves y links configurados.
 - Si el banco pide segunda clave, Fintoc puede requerir MFA mediante refresh intents.
 
 ## SII con Fintoc
@@ -32,4 +34,4 @@ Estos documentos alimentan ventas, compras, IVA, cuentas por cobrar y cuentas po
 
 ## Limitacion de GitHub Pages
 
-La version publicada en GitHub Pages es estatica y no puede guardar claves secretas ni llamar Fintoc directamente. Para sincronizacion real se debe usar la app local o desplegar un backend con HTTPS.
+La version publicada en GitHub Pages es estatica y no puede guardar claves secretas ni llamar Fintoc directamente. Sirve para revisar la interfaz, guardar datos de prueba en el navegador y actualizar indicadores economicos desde internet. Para sincronizacion real de bancos y SII se debe usar la app local o desplegar un backend con HTTPS.
