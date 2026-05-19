@@ -177,10 +177,12 @@ function defaultCompanyData(name = "Nueva empresa", rut = "") {
       cashflowDays: 60,
       bankSyncTime: "08:30",
       cardSyncTime: "08:45",
-    lastBankSync: null,
-    lastCardSync: null,
-    lastDailyRun: null,
-    lastSiiSync: null,
+      lastBankSync: null,
+      lastCardSync: null,
+      lastDailyRun: null,
+      lastSiiSync: null,
+      fintocLinks: [],
+      fintocLastError: "",
       economicIndicators: state?.settings?.economicIndicators || {
         uf: 39000,
         usd: 950,
@@ -345,6 +347,21 @@ function totalCreditLineAvailable() {
   return total(state.bankAccounts || [], (account) => toClp(creditLineAvailable(account), account.currency || "CLP"));
 }
 
+function fintocLinks(product = "") {
+  const links = state?.settings?.fintocLinks || [];
+  return product ? links.filter((link) => link.product === product) : links;
+}
+
+function fintocConnectionLabel(product) {
+  const count = fintocLinks(product).length;
+  if (!count) return "Pendiente";
+  return count === 1 ? "1 conexion" : `${count} conexiones`;
+}
+
+function cleanRut(value) {
+  return String(value || "").replace(/[^0-9kK]/g, "");
+}
+
 function flowDate(value) {
   const parsed = parseDate(value);
   if (!parsed) return "";
@@ -462,6 +479,9 @@ function migrateState() {
     lastBankSync: null,
     lastCardSync: null,
     lastDailyRun: null,
+    lastSiiSync: null,
+    fintocLinks: [],
+    fintocLastError: "",
     economicIndicators: {
       uf: 39000,
       usd: 950,
@@ -486,6 +506,9 @@ function migrateState() {
     movements: [],
     creditLineLimit: 0,
     creditLineRate: 0,
+    fintocAccountId: "",
+    fintocLinkId: "",
+    lastFintocSync: null,
     ...account
   }));
 
@@ -908,6 +931,41 @@ function renderDailyStatus() {
   `).join("");
 }
 
+function renderFintocPanel() {
+  const bankLinks = fintocLinks("movements");
+  const fiscalLinks = fintocLinks("invoices");
+  const connectedAccounts = (state.bankAccounts || []).filter((account) => account.fintocAccountId).length;
+  const lastBank = state.settings.lastBankSync ? new Date(state.settings.lastBankSync).toLocaleString("es-CL") : "Sin descarga";
+  const lastSii = state.settings.lastSiiSync ? new Date(state.settings.lastSiiSync).toLocaleString("es-CL") : "Sin descarga";
+  $("#fintocPanel").innerHTML = `
+    <div class="fintoc-card">
+      <span>Empresa activa</span>
+      <strong>${state.company.name}</strong>
+      <small>${state.company.rut || "RUT pendiente"}</small>
+    </div>
+    <div class="fintoc-card">
+      <span>Bancos</span>
+      <strong>${fintocConnectionLabel("movements")}</strong>
+      <small>${connectedAccounts} cuentas conectadas</small>
+      <button class="secondary-button" id="connectFintocBankButton" data-tooltip="Abre Fintoc para conectar el banco de esta empresa.">Conectar banco</button>
+    </div>
+    <div class="fintoc-card">
+      <span>SII</span>
+      <strong>${fintocConnectionLabel("invoices")}</strong>
+      <small>Compras y ventas fiscales</small>
+      <button class="secondary-button" id="connectFintocSiiButton" data-tooltip="Abre Fintoc Fiscal para conectar el RCV del SII.">Conectar SII</button>
+    </div>
+    <div class="fintoc-card">
+      <span>Ultima descarga</span>
+      <strong>${lastBank}</strong>
+      <small>SII: ${lastSii}</small>
+    </div>
+    ${state.settings.fintocLastError ? `<div class="fintoc-card warning"><span>Atencion</span><strong>${state.settings.fintocLastError}</strong></div>` : ""}
+  `;
+  $("#connectFintocBankButton")?.addEventListener("click", () => connectFintoc("movements"));
+  $("#connectFintocSiiButton")?.addEventListener("click", () => connectFintoc("invoices"));
+}
+
 function renderUpcoming() {
   const items = cashflowEvents(14);
   $("#upcomingList").innerHTML = items.length ? items.map((event) => `
@@ -1218,6 +1276,7 @@ function renderAccounts() {
     <button class="card clickable" data-account-id="${account.id}">
       <strong>${account.name}</strong>
       <span>${account.bank} - ${account.number}</span>
+      ${account.fintocAccountId ? `<span class="tag">Fintoc</span>` : ""}
       <div class="card-row">
         <span>Saldo actual ${account.currency || "CLP"}</span>
         <strong>${formatCurrency(account.balance, account.currency || "CLP")}</strong>
@@ -1350,6 +1409,8 @@ function renderAccountDetail() {
       <div class="mini-metric"><span>Tasa linea</span><strong>${Number(account.creditLineRate || 0).toFixed(2)}%</strong></div>
       <div class="mini-metric"><span>Movimientos</span><strong>${movements.length}</strong></div>
       <div class="mini-metric"><span>Conciliados</span><strong>${movements.filter((item) => item.matchedTo).length}</strong></div>
+      <div class="mini-metric"><span>Fintoc</span><strong>${account.fintocAccountId ? "Conectada" : "Sin link"}</strong></div>
+      <div class="mini-metric"><span>Ultima descarga</span><strong>${account.lastFintocSync ? new Date(account.lastFintocSync).toLocaleString("es-CL") : "-"}</strong></div>
     </div>
     <div class="table-wrap">
       <table>
@@ -1866,6 +1927,7 @@ function render() {
   renderCompanySwitcher();
   renderEconomicIndicators();
   renderDailyStatus();
+  renderFintocPanel();
   renderMetrics();
   renderUpcoming();
   renderActivity();
@@ -2458,13 +2520,8 @@ function bindActions() {
     await saveState("Nueva empresa creada.");
   });
 
-  $("#syncSiiButton").addEventListener("click", async () => {
-    const response = await fetch("/api/sii/sync", { method: "POST" });
-    state = await response.json();
-    migrateState();
-    render();
-    showNotice("Sincronizacion SII simulada registrada.");
-  });
+  $("#syncSiiButton").addEventListener("click", syncSii);
+  $("#fintocSyncAllButton").addEventListener("click", syncFintocAll);
 
   $("#ivaMonth").addEventListener("change", () => {
     renderSii();
@@ -2514,12 +2571,95 @@ async function syncIndicators() {
   }
 }
 
+async function connectFintoc(product) {
+  try {
+    if (!window.Fintoc) {
+      throw new Error("No se pudo cargar el widget de Fintoc. Revisa internet y vuelve a intentar.");
+    }
+    const response = await fetch("/api/fintoc/link-intent", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ product, companyId: state.activeCompanyId })
+    });
+    if (!response.ok) {
+      const error = await response.json().catch(() => ({}));
+      throw new Error(error.error || error.message || "No se pudo iniciar Fintoc.");
+    }
+    const intent = await response.json();
+    const widget = window.Fintoc.create({
+      publicKey: intent.publicKey,
+      widgetToken: intent.widgetToken,
+      product,
+      country: "cl",
+      holderType: "business",
+      holderId: cleanRut(state.company.rut) ? { value: cleanRut(state.company.rut), editable: true } : undefined,
+      onSuccess: async (linkIntent) => {
+        const exchangeToken = linkIntent.exchangeToken || linkIntent.exchange_token;
+        const linkToken = linkIntent.linkToken || linkIntent.link_token;
+        const exchangeResponse = await fetch("/api/fintoc/exchange", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            product,
+            exchangeToken,
+            linkToken,
+            companyId: state.activeCompanyId
+          })
+        });
+        if (!exchangeResponse.ok) {
+          const error = await exchangeResponse.json().catch(() => ({}));
+          throw new Error(error.error || error.message || "No se pudo guardar la conexion Fintoc.");
+        }
+        state = await exchangeResponse.json();
+        migrateState();
+        render();
+        showNotice(product === "invoices" ? "SII conectado con Fintoc." : "Banco conectado con Fintoc.");
+      },
+      onExit: () => showNotice("Conexion Fintoc cerrada.")
+    });
+    widget.open();
+  } catch (error) {
+    showNotice(error.message);
+  }
+}
+
 async function syncBank() {
-  const response = await fetch("/api/bank/sync", { method: "POST" });
-  state = await response.json();
-  migrateState();
-  render();
-  showNotice("Sincronizacion bancaria registrada. Falta conectar credenciales/API del banco.");
+  try {
+    const response = await fetch("/api/bank/sync", { method: "POST" });
+    if (!response.ok) {
+      const error = await response.json().catch(() => ({}));
+      throw new Error(error.error || error.message || "No se pudo sincronizar bancos.");
+    }
+    state = await response.json();
+    const mfa = state.fintocMfa || [];
+    delete state.fintocMfa;
+    migrateState();
+    render();
+    showNotice(mfa.length ? "Banco sincronizado. Un banco puede pedir segunda clave en Fintoc." : "Bancos actualizados.");
+  } catch (error) {
+    showNotice(error.message);
+  }
+}
+
+async function syncSii() {
+  try {
+    const response = await fetch("/api/sii/sync", { method: "POST" });
+    if (!response.ok) {
+      const error = await response.json().catch(() => ({}));
+      throw new Error(error.error || error.message || "No se pudo sincronizar SII.");
+    }
+    state = await response.json();
+    migrateState();
+    render();
+    showNotice("SII actualizado.");
+  } catch (error) {
+    showNotice(error.message);
+  }
+}
+
+async function syncFintocAll() {
+  await syncBank();
+  await syncSii();
 }
 
 async function syncCards() {
@@ -2537,8 +2677,16 @@ async function runDailyRoutine() {
   } catch {
     addLog("No se pudieron actualizar indicadores en la rutina diaria.");
   }
-  state.settings.lastSiiSync = new Date().toISOString();
-  state.settings.lastBankSync = new Date().toISOString();
+  try {
+    await syncBank();
+  } catch {
+    addLog("No se pudo sincronizar banco en la rutina diaria.");
+  }
+  try {
+    await syncSii();
+  } catch {
+    addLog("No se pudo sincronizar SII en la rutina diaria.");
+  }
   for (const card of state.creditCards || []) {
     card.lastSync = new Date().toISOString();
   }

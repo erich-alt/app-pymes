@@ -266,6 +266,47 @@ h2 {
   box-shadow: var(--shadow);
 }
 
+.fintoc-center {
+  margin-bottom: 18px;
+  padding: 16px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: var(--surface);
+  box-shadow: var(--shadow);
+}
+
+.fintoc-grid {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(160px, 1fr));
+  gap: 10px;
+}
+
+.fintoc-card {
+  display: grid;
+  gap: 8px;
+  align-content: start;
+  padding: 12px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: #f8fbfa;
+}
+
+.fintoc-card span {
+  color: var(--muted);
+  font-size: 12px;
+  font-weight: 700;
+  text-transform: uppercase;
+}
+
+.fintoc-card small {
+  color: var(--muted);
+}
+
+.fintoc-card.warning {
+  border-color: #e4c999;
+  background: #fff8ed;
+}
+
 .daily-head {
   display: flex;
   justify-content: space-between;
@@ -777,6 +818,7 @@ th {
   .quick-actions,
   .indicator-strip,
   .daily-grid,
+  .fintoc-grid,
   .layout-two,
   .form-grid,
   .filter-bar,

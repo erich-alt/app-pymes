@@ -22,6 +22,7 @@ Base de una app local para administracion financiera de pymes en Chile.
 - Movimientos de cuenta corriente al apretar cada cuenta.
 - Importacion de cartolas desde CSV, TXT, XLSX y PDF.
 - Importacion manual SII para compras y ventas desde CSV, TXT, XLSX y PDF.
+- Integracion preparada con Fintoc para conectar bancos y SII por empresa desde el dashboard.
 - Calculo de ventas y costos netos mensual y anual desde documentos SII.
 - Calculo mensual de IVA debito, IVA credito y resultado a pagar o recuperar, con pago antes del 20 del mes siguiente.
 - Identificacion basica de importaciones y exportaciones en documentos SII.
@@ -90,5 +91,6 @@ Ese archivo se crea automaticamente la primera vez que se inicia la app.
 - Excel soportado: `.xlsx`.
 - Excel antiguo `.xls`: convertir a `.xlsx` o CSV antes de importar.
 - PDF: se intenta leer el texto del documento. Algunos bancos generan PDF escaneados como imagen; esos requeriran OCR en una etapa posterior.
-- La sincronizacion bancaria actual deja el flujo preparado, pero no descarga cartolas reales hasta configurar conectores por banco.
+- La sincronizacion bancaria puede usar Fintoc si se configuran `FINTOC_SECRET_KEY` y `FINTOC_PUBLIC_KEY` en `.env`.
 - La sincronizacion de tarjetas actual registra la descarga en la app, pero no descarga movimientos reales hasta configurar conectores por banco/emisor.
+- La version GitHub Pages es estatica: sirve para revisar y trabajar con datos de ejemplo, pero Fintoc real requiere la app local o un backend seguro. Ver `docs/FINTOC-CONEXION.md`.

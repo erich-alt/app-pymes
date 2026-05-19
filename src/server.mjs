@@ -9,7 +9,9 @@ const publicDir = path.join(root, "public");
 const dataDir = path.join(root, "data");
 const dataFile = path.join(dataDir, "app-data.json");
 const seedFile = path.join(dataDir, "seed.json");
+const envFile = path.join(root, ".env");
 const port = Number(process.env.PORT || 8899);
+const fintocBaseUrl = "https://api.fintoc.com";
 
 const contentTypes = {
   ".html": "text/html; charset=utf-8",
@@ -29,6 +31,20 @@ async function ensureDataFile() {
   }
 }
 
+async function loadLocalEnv() {
+  try {
+    const raw = await fs.readFile(envFile, "utf8");
+    for (const line of raw.split(/\r?\n/)) {
+      const clean = line.trim();
+      if (!clean || clean.startsWith("#") || !clean.includes("=")) continue;
+      const [key, ...valueParts] = clean.split("=");
+      if (!process.env[key]) process.env[key] = valueParts.join("=").trim().replace(/^"|"$/g, "");
+    }
+  } catch {
+    // .env is optional. Production deployments should provide real environment variables.
+  }
+}
+
 async function readJsonBody(req) {
   const chunks = [];
   for await (const chunk of req) chunks.push(chunk);
@@ -45,6 +61,32 @@ async function readBuffer(req) {
 function sendJson(res, status, payload) {
   res.writeHead(status, { "Content-Type": "application/json; charset=utf-8" });
   res.end(JSON.stringify(payload, null, 2));
+}
+
+function requireFintocConfig() {
+  if (!process.env.FINTOC_SECRET_KEY || !process.env.FINTOC_PUBLIC_KEY) {
+    throw new Error("Falta configurar FINTOC_SECRET_KEY y FINTOC_PUBLIC_KEY en .env.");
+  }
+}
+
+async function fintocRequest(pathname, options = {}) {
+  requireFintocConfig();
+  const response = await fetch(`${fintocBaseUrl}${pathname}`, {
+    ...options,
+    headers: {
+      "Accept": "application/json",
+      "Content-Type": "application/json",
+      "Authorization": process.env.FINTOC_SECRET_KEY,
+      ...(options.headers || {})
+    }
+  });
+  const text = await response.text();
+  const data = text ? JSON.parse(text) : {};
+  if (!response.ok) {
+    const message = data?.error?.message || data?.message || "Fintoc no pudo completar la solicitud.";
+    throw new Error(message);
+  }
+  return data;
 }
 
 function safeId(prefix) {
@@ -251,6 +293,200 @@ function normalizeSiiRows(rows, direction) {
   }).filter((doc) => doc.folio || doc.total || doc.counterparty !== "Sin razon social");
 }
 
+function activeCompany(state) {
+  return (state.companies || []).find((company) => company.id === state.activeCompanyId);
+}
+
+function persistTopLevelCompany(state) {
+  const active = activeCompany(state);
+  if (!active) return;
+  const keys = [
+    "company",
+    "settings",
+    "bankAccounts",
+    "receivables",
+    "payables",
+    "credits",
+    "documents",
+    "activityLog",
+    "checksReceivable",
+    "checksPayable",
+    "creditCards",
+    "investments"
+  ];
+  active.name = state.company?.name || active.name;
+  active.rut = state.company?.rut || active.rut;
+  active.data = Object.fromEntries(keys.map((key) => [key, state[key]]));
+}
+
+function ensureFintocSettings(state) {
+  state.settings = state.settings || {};
+  state.settings.fintocLinks = state.settings.fintocLinks || [];
+  state.settings.fintocLastError = state.settings.fintocLastError || "";
+  return state.settings.fintocLinks;
+}
+
+function normalizeFintocBalance(account) {
+  const balance = account.balance || {};
+  return Number(balance.available ?? balance.current ?? balance.amount ?? account.available_balance ?? account.balance_amount ?? 0);
+}
+
+function normalizeFintocAccount(account, link) {
+  const institution = account.institution || link.institution || {};
+  return {
+    bank: institution.name || link.institutionName || "Banco Fintoc",
+    name: account.name || account.official_name || account.type || "Cuenta Fintoc",
+    number: account.number || account.mask || account.id,
+    currency: account.currency || account.balance?.currency || "CLP",
+    balance: normalizeFintocBalance(account),
+    fintocAccountId: account.id,
+    fintocLinkId: link.id,
+    fintocInstitutionId: institution.id || link.institutionId || "",
+    fintocConnectedAt: link.connectedAt || new Date().toISOString()
+  };
+}
+
+function normalizeFintocMovement(movement, account) {
+  return {
+    id: movement.id || safeId("mov"),
+    date: parseDateValue(movement.post_date || movement.transaction_date || movement.date),
+    description: movement.description || movement.comment || movement.type || "Movimiento Fintoc",
+    document: movement.reference_id || "",
+    amount: Number(movement.amount || 0),
+    balance: Number(movement.balance || 0),
+    source: "fintoc",
+    fintocMovementId: movement.id || "",
+    currency: movement.currency || account.currency || "CLP",
+    pending: Boolean(movement.pending),
+    matchedTo: null
+  };
+}
+
+function movementKeyForServer(item) {
+  return [
+    item.fintocMovementId || "",
+    item.date || "",
+    String(item.document || "").trim().toLowerCase(),
+    String(item.description || "").trim().toLowerCase(),
+    Number(item.amount || 0).toFixed(2)
+  ].join("|");
+}
+
+async function listFintocAccounts(linkToken) {
+  const query = new URLSearchParams({ link_token: linkToken });
+  const data = await fintocRequest(`/v1/accounts/?${query}`);
+  return Array.isArray(data) ? data : data.data || data.accounts || [];
+}
+
+async function listFintocMovements(accountId, linkToken, since) {
+  const movements = [];
+  for (let page = 1; page <= 20; page += 1) {
+    const query = new URLSearchParams({
+      link_token: linkToken,
+      per_page: "300",
+      page: String(page),
+      confirmed_only: "false"
+    });
+    if (since) query.set("since", since);
+    const data = await fintocRequest(`/v1/accounts/${accountId}/movements?${query}`);
+    const batch = Array.isArray(data) ? data : data.data || data.movements || [];
+    movements.push(...batch);
+    if (batch.length < 300) break;
+  }
+  return movements;
+}
+
+async function createRefreshIntent(linkToken) {
+  try {
+    const query = new URLSearchParams({ link_token: linkToken });
+    return await fintocRequest(`/v1/refresh_intents?${query}`, { method: "POST" });
+  } catch (error) {
+    return { error: error.message };
+  }
+}
+
+function normalizeFintocInvoice(invoice, direction) {
+  const fiscal = invoice.institution_invoice || {};
+  const counterparty = direction === "sales" ? invoice.receiver : invoice.issuer;
+  return {
+    id: invoice.id || safeId(direction === "sales" ? "sale" : "purchase"),
+    type: String(fiscal.document_type || invoice.document_type || "DTE"),
+    folio: String(invoice.number || invoice.folio || ""),
+    rut: String(counterparty?.id || ""),
+    counterparty: counterparty?.name || "Sin razon social",
+    date: parseDateValue(invoice.date),
+    dueDate: parseDateValue(invoice.due_date || invoice.date),
+    net: Number(invoice.net_amount ?? fiscal.net_amount ?? 0),
+    exempt: Number(fiscal.exempt_amount || 0),
+    tax: Number(fiscal.vat_amount ?? invoice.tax_amount ?? 0),
+    total: Number(invoice.total_amount ?? 0),
+    operation: "nacional",
+    source: "fintoc-sii",
+    fintocInvoiceId: invoice.id || ""
+  };
+}
+
+async function listFintocInvoices(linkToken, issueType, since, until) {
+  const invoices = [];
+  for (let page = 1; page <= 20; page += 1) {
+    const query = new URLSearchParams({
+      link_token: linkToken,
+      issue_type: issueType,
+      invoice_status: "registered",
+      page: String(page),
+      per_page: "300"
+    });
+    if (since) query.set("since", since);
+    if (until) query.set("until", until);
+    const data = await fintocRequest(`/v1/invoices?${query}`);
+    const batch = Array.isArray(data) ? data : data.data || data.invoices || [];
+    invoices.push(...batch);
+    if (batch.length < 300) break;
+  }
+  return invoices;
+}
+
+function upsertDocumentsFromFintoc(state, documents, direction) {
+  const target = direction === "sales" ? state.documents.sales : state.documents.purchases;
+  const existing = new Set(target.map((doc) => doc.fintocInvoiceId || documentKey(doc)));
+  let added = 0;
+  for (const doc of documents) {
+    const key = doc.fintocInvoiceId || documentKey(doc);
+    if (existing.has(key)) continue;
+    existing.add(key);
+    target.push(doc);
+    added += 1;
+    if (direction === "sales") {
+      state.receivables.push({
+        id: safeId("ar"),
+        customer: doc.counterparty,
+        item: "Ventas",
+        document: `${doc.type} ${doc.folio}`.trim(),
+        issueDate: doc.date,
+        dueDate: doc.dueDate || doc.date,
+        amount: Number(doc.total || 0),
+        status: "pendiente",
+        source: "fintoc-sii",
+        siiDocumentId: doc.id
+      });
+    } else {
+      state.payables.push({
+        id: safeId("ap"),
+        supplier: doc.counterparty,
+        item: "Compras",
+        document: `${doc.type} ${doc.folio}`.trim(),
+        issueDate: doc.date,
+        dueDate: doc.dueDate || doc.date,
+        amount: Number(doc.total || 0),
+        status: "pendiente",
+        source: "fintoc-sii",
+        siiDocumentId: doc.id
+      });
+    }
+  }
+  return added;
+}
+
 async function readState() {
   await ensureDataFile();
   return JSON.parse(await fs.readFile(dataFile, "utf8"));
@@ -263,6 +499,94 @@ async function writeState(state) {
 async function handleApi(req, res, url) {
   if (req.method === "GET" && url.pathname === "/api/state") {
     sendJson(res, 200, await readState());
+    return true;
+  }
+
+  if (req.method === "GET" && url.pathname === "/api/fintoc/status") {
+    const state = await readState();
+    const links = ensureFintocSettings(state).map((link) => ({
+      id: link.id,
+      product: link.product,
+      institutionName: link.institutionName,
+      connectedAt: link.connectedAt,
+      lastSync: link.lastSync
+    }));
+    sendJson(res, 200, {
+      configured: Boolean(process.env.FINTOC_SECRET_KEY && process.env.FINTOC_PUBLIC_KEY),
+      publicKey: process.env.FINTOC_PUBLIC_KEY || "",
+      links,
+      lastError: state.settings.fintocLastError || ""
+    });
+    return true;
+  }
+
+  if (req.method === "POST" && url.pathname === "/api/fintoc/link-intent") {
+    const body = await readJsonBody(req);
+    const product = body.product === "invoices" ? "invoices" : "movements";
+    const payload = {
+      product,
+      country: "cl",
+      holder_type: "business"
+    };
+    const linkIntent = await fintocRequest("/v1/link_intents", {
+      method: "POST",
+      body: JSON.stringify(payload)
+    });
+    sendJson(res, 201, {
+      publicKey: process.env.FINTOC_PUBLIC_KEY,
+      product,
+      country: "cl",
+      holderType: "business",
+      widgetToken: linkIntent.widget_token || linkIntent.widgetToken,
+      linkIntent
+    });
+    return true;
+  }
+
+  if (req.method === "POST" && url.pathname === "/api/fintoc/exchange") {
+    const body = await readJsonBody(req);
+    const exchangeToken = body.exchangeToken || body.exchange_token;
+    if (!exchangeToken && !body.linkToken) throw new Error("Falta el token de conexion de Fintoc.");
+    const state = await readState();
+    const links = ensureFintocSettings(state);
+    const product = body.product === "invoices" ? "invoices" : "movements";
+    const link = body.linkToken
+      ? { id: body.linkId || safeId("fintoc-link"), link_token: body.linkToken, institution: body.institution || {} }
+      : await fintocRequest(`/v1/links/exchange?${new URLSearchParams({ exchange_token: exchangeToken })}`);
+    const linkToken = link.link_token || link.linkToken || link.token;
+    if (!linkToken) throw new Error("Fintoc no devolvio link_token. Revisa el flujo de conexion.");
+    const storedLink = {
+      id: link.id || safeId("fintoc-link"),
+      product,
+      linkToken,
+      institutionId: link.institution?.id || link.institution_id || "",
+      institutionName: link.institution?.name || link.institution_name || (product === "invoices" ? "SII" : "Banco"),
+      connectedAt: new Date().toISOString(),
+      lastSync: null
+    };
+    const existingIndex = links.findIndex((item) => item.id === storedLink.id || item.linkToken === storedLink.linkToken);
+    if (existingIndex >= 0) links[existingIndex] = { ...links[existingIndex], ...storedLink };
+    else links.push(storedLink);
+
+    if (product === "movements") {
+      const accounts = await listFintocAccounts(linkToken);
+      for (const fintocAccount of accounts) {
+        const normalized = normalizeFintocAccount(fintocAccount, storedLink);
+        const existing = (state.bankAccounts || []).find((account) => account.fintocAccountId === normalized.fintocAccountId);
+        if (existing) Object.assign(existing, normalized);
+        else state.bankAccounts.push({ id: safeId("bank"), movements: [], creditLineLimit: 0, creditLineRate: 0, ...normalized });
+      }
+    }
+
+    state.activityLog = state.activityLog || [];
+    state.activityLog.unshift({
+      id: safeId("log"),
+      date: new Date().toISOString(),
+      message: `${product === "invoices" ? "SII" : "Banco"} conectado con Fintoc.`
+    });
+    persistTopLevelCompany(state);
+    await writeState(state);
+    sendJson(res, 200, state);
     return true;
   }
 
@@ -281,13 +605,41 @@ async function handleApi(req, res, url) {
 
   if (req.method === "POST" && url.pathname === "/api/sii/sync") {
     const state = await readState();
+    const links = ensureFintocSettings(state).filter((link) => link.product === "invoices" && link.linkToken);
+    if (process.env.FINTOC_SECRET_KEY && process.env.FINTOC_PUBLIC_KEY && links.length) {
+      const since = url.searchParams.get("since") || `${new Date().getFullYear()}-01-01`;
+      const until = url.searchParams.get("until") || "";
+      let salesAdded = 0;
+      let purchasesAdded = 0;
+      for (const link of links) {
+        const issued = await listFintocInvoices(link.linkToken, "issued", since, until);
+        const received = await listFintocInvoices(link.linkToken, "received", since, until);
+        salesAdded += upsertDocumentsFromFintoc(state, issued.map((invoice) => normalizeFintocInvoice(invoice, "sales")), "sales");
+        purchasesAdded += upsertDocumentsFromFintoc(state, received.map((invoice) => normalizeFintocInvoice(invoice, "purchases")), "purchases");
+        link.lastSync = new Date().toISOString();
+      }
+      state.settings.lastSiiSync = new Date().toISOString();
+      state.settings.fintocLastError = "";
+      state.activityLog = state.activityLog || [];
+      state.activityLog.unshift({
+        id: safeId("log"),
+        date: new Date().toISOString(),
+        message: `SII sincronizado con Fintoc. Ventas nuevas: ${salesAdded}. Compras nuevas: ${purchasesAdded}.`
+      });
+      persistTopLevelCompany(state);
+      await writeState(state);
+      sendJson(res, 200, state);
+      return true;
+    }
+
     state.settings.lastSiiSync = new Date().toISOString();
     state.activityLog = state.activityLog || [];
     state.activityLog.unshift({
       id: safeId("log"),
       date: new Date().toISOString(),
-      message: "Sincronizacion SII simulada. Pendiente conectar mecanismo oficial."
+      message: "Sincronizacion SII simulada. Pendiente conectar Fintoc Fiscal o importar archivo."
     });
+    persistTopLevelCompany(state);
     await writeState(state);
     sendJson(res, 200, state);
     return true;
@@ -295,13 +647,59 @@ async function handleApi(req, res, url) {
 
   if (req.method === "POST" && url.pathname === "/api/bank/sync") {
     const state = await readState();
+    const links = ensureFintocSettings(state).filter((link) => link.product === "movements" && link.linkToken);
+    if (process.env.FINTOC_SECRET_KEY && process.env.FINTOC_PUBLIC_KEY && links.length) {
+      let newMovements = 0;
+      const mfa = [];
+      for (const link of links) {
+        const refresh = await createRefreshIntent(link.linkToken);
+        if (refresh?.requires_mfa?.widget_token) mfa.push({ linkId: link.id, widgetToken: refresh.requires_mfa.widget_token });
+        const accounts = await listFintocAccounts(link.linkToken);
+        for (const fintocAccount of accounts) {
+          const normalized = normalizeFintocAccount(fintocAccount, link);
+          let account = (state.bankAccounts || []).find((item) => item.fintocAccountId === normalized.fintocAccountId);
+          if (!account) {
+            account = { id: safeId("bank"), movements: [], creditLineLimit: 0, creditLineRate: 0, ...normalized };
+            state.bankAccounts.push(account);
+          } else {
+            Object.assign(account, normalized);
+          }
+          const latestDate = (account.movements || []).map((item) => item.date).filter(Boolean).sort().at(-1);
+          const movements = await listFintocMovements(fintocAccount.id, link.linkToken, latestDate);
+          const existing = new Set((account.movements || []).map(movementKeyForServer));
+          for (const movement of movements.map((item) => normalizeFintocMovement(item, account))) {
+            const key = movementKeyForServer(movement);
+            if (existing.has(key)) continue;
+            existing.add(key);
+            account.movements.unshift(movement);
+            newMovements += 1;
+          }
+          account.lastFintocSync = new Date().toISOString();
+        }
+        link.lastSync = new Date().toISOString();
+      }
+      state.settings.lastBankSync = new Date().toISOString();
+      state.settings.fintocLastError = "";
+      state.activityLog = state.activityLog || [];
+      state.activityLog.unshift({
+        id: safeId("log"),
+        date: new Date().toISOString(),
+        message: `Bancos sincronizados con Fintoc. Movimientos nuevos: ${newMovements}${mfa.length ? ". Un banco pidio segunda clave." : "."}`
+      });
+      persistTopLevelCompany(state);
+      await writeState(state);
+      sendJson(res, 200, { ...state, fintocMfa: mfa });
+      return true;
+    }
+
     state.settings.lastBankSync = new Date().toISOString();
     state.activityLog = state.activityLog || [];
     state.activityLog.unshift({
       id: safeId("log"),
       date: new Date().toISOString(),
-      message: "Sincronizacion bancaria registrada. Falta configurar conectores reales del banco."
+      message: "Sincronizacion bancaria registrada. Falta conectar Fintoc o importar cartola."
     });
+    persistTopLevelCompany(state);
     await writeState(state);
     sendJson(res, 200, state);
     return true;
@@ -368,6 +766,7 @@ async function serveStatic(req, res, url) {
   }
 }
 
+await loadLocalEnv();
 await ensureDataFile();
 
 const server = http.createServer(async (req, res) => {

@@ -65,6 +65,16 @@
             </div>
             <div class="daily-grid" id="dailyStatus"></div>
           </section>
+          <section class="fintoc-center">
+            <div class="daily-head">
+              <div>
+                <p class="eyebrow">Conexion automatica</p>
+                <h2>Fintoc bancos y SII</h2>
+              </div>
+              <button class="primary-button" id="fintocSyncAllButton" data-tooltip="Descarga cartolas bancarias y documentos SII de la empresa seleccionada.">Actualizar todo</button>
+            </div>
+            <div id="fintocPanel" class="fintoc-grid"></div>
+          </section>
           <div class="metrics" id="metrics"></div>
           <div class="quick-actions">
             <button class="quick-action" data-quick-view="sales" data-tooltip="Ir a ventas filtrables por cliente y periodo.">
@@ -585,6 +595,7 @@
       </main>
     </div>
 
+    <script src="https://js.fintoc.com/v1/"></script>
     <script src="app.js" type="module"></script>
   </body>
 </html>
