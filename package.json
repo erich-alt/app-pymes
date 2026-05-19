@@ -1,0 +1,16 @@
+{
+  "name": "pyme-local",
+  "version": "0.1.0",
+  "description": "App local para administracion financiera de pymes chilenas.",
+  "type": "module",
+  "scripts": {
+    "start": "node src/server.mjs"
+  },
+  "dependencies": {
+    "exceljs": "^4.4.0",
+    "pdf-parse": "^1.1.1"
+  },
+  "engines": {
+    "node": ">=20"
+  }
+}

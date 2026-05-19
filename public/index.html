@@ -1,0 +1,590 @@
+<!doctype html>
+<html lang="es">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Pyme Local</title>
+    <link rel="stylesheet" href="styles.css">
+  </head>
+  <body>
+    <div class="shell">
+      <aside class="sidebar">
+        <div class="brand">
+          <div class="brand-mark">PL</div>
+          <div>
+            <strong>Pyme Local</strong>
+            <span>Gestion financiera</span>
+          </div>
+        </div>
+        <nav class="nav" aria-label="Modulos">
+          <button class="nav-item active" data-view="dashboard" data-tooltip="Vista principal con alertas, indicadores y resumen financiero.">Panel</button>
+          <button class="nav-item" data-view="cashflow" data-tooltip="Proyeccion diaria de caja para los proximos 60 dias.">Flujo 60 dias</button>
+          <button class="nav-item" data-view="sales" data-tooltip="Consulta ventas, filtra por cliente y periodo, y revisa indicadores comerciales.">Ventas</button>
+          <button class="nav-item" data-view="foreignTrade" data-tooltip="Registra importaciones y exportaciones con moneda y tipo de cambio.">Comercio exterior</button>
+          <button class="nav-item" data-view="sii" data-tooltip="Importa compras y ventas del SII y calcula IVA mensual.">SII</button>
+          <button class="nav-item" data-view="credits" data-tooltip="Administra creditos y sus cuadros de desarrollo.">Creditos</button>
+          <button class="nav-item" data-view="accounts" data-tooltip="Administra cuentas corrientes, saldos y movimientos.">Cuentas</button>
+          <button class="nav-item" data-view="cards" data-tooltip="Administra tarjetas de credito, cupos y movimientos.">Tarjetas</button>
+          <button class="nav-item" data-view="investments" data-tooltip="Administra depositos a plazo, pactos y fondos mutuos, y los incorpora al flujo.">Inversiones</button>
+          <button class="nav-item" data-view="checks" data-tooltip="Registra cheques por cobrar y por pagar.">Cheques</button>
+          <button class="nav-item" data-view="receivables" data-tooltip="Facturas, ventas y documentos pendientes de cobro.">Por cobrar</button>
+          <button class="nav-item" data-view="payables" data-tooltip="Facturas, gastos y documentos pendientes de pago.">Por pagar</button>
+          <button class="nav-item" data-view="reports" data-tooltip="Genera reportes imprimibles en distintos idiomas y monedas.">Reportes</button>
+        </nav>
+      </aside>
+
+      <main class="main">
+        <header class="topbar">
+          <div>
+            <p class="eyebrow" id="companyRut">RUT</p>
+            <h1 id="companyName">Pyme Local</h1>
+          </div>
+          <div class="company-switch">
+            <select id="companySelect" aria-label="Seleccionar empresa"></select>
+            <button class="secondary-button" id="addCompanyButton" data-tooltip="Crea una empresa separada con sus propios datos.">Nueva empresa</button>
+          </div>
+          <div class="actions">
+            <button class="icon-button" id="refreshButton" title="Actualizar datos" aria-label="Actualizar datos" data-tooltip="Recarga los datos guardados localmente.">
+              <span class="icon">R</span>
+            </button>
+            <button class="primary-button" id="saveButton" data-tooltip="Guarda los cambios en el archivo local de la app.">Guardar</button>
+          </div>
+        </header>
+
+        <section class="notice" id="notice" hidden></section>
+
+        <section class="view active" id="view-dashboard">
+          <div class="indicator-strip" id="economicIndicators"></div>
+          <section class="daily-center">
+            <div class="daily-head">
+              <div>
+                <p class="eyebrow">Gestion diaria</p>
+                <h2>Rutina automatizada</h2>
+              </div>
+              <button class="primary-button" id="runDailyButton" data-tooltip="Ejecuta la revision diaria: indicadores, SII, banco, tarjetas, IVA y alertas.">Ejecutar rutina diaria</button>
+            </div>
+            <div class="daily-grid" id="dailyStatus"></div>
+          </section>
+          <div class="metrics" id="metrics"></div>
+          <div class="quick-actions">
+            <button class="quick-action" data-quick-view="sales" data-tooltip="Ir a ventas filtrables por cliente y periodo.">
+              <strong>Ver ventas</strong>
+              <span>Clientes, plazos y promedio</span>
+            </button>
+            <button class="quick-action" data-quick-view="foreignTrade" data-tooltip="Ingresar importaciones o exportaciones de forma guiada.">
+              <strong>Comercio exterior</strong>
+              <span>Moneda, TC, IVA y vencimiento</span>
+            </button>
+            <button class="quick-action" data-quick-view="reports" data-tooltip="Abrir informes imprimibles y reportes comerciales.">
+              <strong>Reportes</strong>
+              <span>Financiero, flujo y ventas</span>
+            </button>
+          </div>
+          <div class="layout-two">
+            <section class="panel">
+              <div class="panel-head">
+                <h2>Proximos 14 dias</h2>
+              </div>
+              <div id="upcomingList" class="event-list"></div>
+            </section>
+            <section class="panel">
+              <div class="panel-head">
+                <h2>Actividad</h2>
+              </div>
+              <div id="activityLog" class="event-list"></div>
+            </section>
+          </div>
+        </section>
+
+        <section class="view" id="view-sales">
+          <section class="panel">
+            <div class="panel-head">
+              <div>
+                <p class="eyebrow">Ventas</p>
+                <h2>Consulta comercial</h2>
+              </div>
+              <button class="secondary-button" id="clearSalesFiltersButton" data-tooltip="Limpia los filtros de ventas.">Limpiar filtros</button>
+            </div>
+            <div class="filter-bar">
+              <input id="salesClientFilter" placeholder="Filtrar por cliente">
+              <input id="salesDateFrom" type="date">
+              <input id="salesDateTo" type="date">
+              <select id="salesOperationFilter">
+                <option value="">Todas</option>
+                <option value="nacional">Nacional</option>
+                <option value="exportacion">Exportacion</option>
+              </select>
+            </div>
+            <div class="mini-metrics" id="salesMetrics"></div>
+            <div class="table-wrap">
+              <table>
+                <thead>
+                  <tr>
+                    <th>Fecha</th>
+                    <th>Cliente</th>
+                    <th>Documento</th>
+                    <th>Operacion</th>
+                    <th>Neto</th>
+                    <th>IVA</th>
+                    <th>Total</th>
+                    <th>Plazo</th>
+                  </tr>
+                </thead>
+                <tbody id="salesRows"></tbody>
+              </table>
+            </div>
+          </section>
+          <section class="panel section-gap">
+            <div class="panel-head">
+              <h2>Reporte por cliente</h2>
+              <span class="subtle">Venta promedio y plazo promedio</span>
+            </div>
+            <div class="table-wrap">
+              <table>
+                <thead>
+                  <tr>
+                    <th>Cliente</th>
+                    <th>Documentos</th>
+                    <th>Venta total</th>
+                    <th>Venta promedio</th>
+                    <th>Plazo pago promedio</th>
+                  </tr>
+                </thead>
+                <tbody id="salesClientSummaryRows"></tbody>
+              </table>
+            </div>
+          </section>
+        </section>
+
+        <section class="view" id="view-foreignTrade">
+          <div class="layout-two">
+            <section class="panel">
+              <div class="panel-head">
+                <div>
+                  <p class="eyebrow">Comercio exterior</p>
+                  <h2>Nuevo registro</h2>
+                </div>
+                <span class="status-pill">Simple</span>
+              </div>
+              <div id="foreignTradeForm" class="form-grid friendly-form">
+                <select id="foreignTradeDirection">
+                  <option value="exportacion">Exportacion</option>
+                  <option value="importacion">Importacion</option>
+                </select>
+                <input id="foreignTradeCounterparty" placeholder="Cliente o proveedor extranjero">
+                <input id="foreignTradeDocument" placeholder="Factura, DIN u otro documento">
+                <input id="foreignTradeDate" type="date">
+                <input id="foreignTradeDueDate" type="date">
+                <select id="foreignTradeCurrency">
+                  <option value="USD">USD</option>
+                  <option value="EUR">EUR</option>
+                  <option value="CLP">CLP</option>
+                </select>
+                <input id="foreignTradeForeignAmount" type="number" placeholder="Monto moneda origen">
+                <input id="foreignTradeExchangeRate" type="number" step="0.01" placeholder="Tipo de cambio">
+                <input id="foreignTradeNetClp" type="number" placeholder="Neto CLP opcional">
+                <input id="foreignTradeVat" type="number" placeholder="IVA CLP">
+                <input id="foreignTradeDuties" type="number" placeholder="Derechos/gastos CLP">
+                <button class="primary-button" id="addForeignTradeButton" data-tooltip="Guarda la operacion, actualiza RCV local y crea el cobro o pago pendiente.">Guardar operacion</button>
+              </div>
+            </section>
+            <section class="panel">
+              <div class="panel-head">
+                <h2>Resumen del mes</h2>
+                <span class="subtle" id="foreignTradePeriodLabel"></span>
+              </div>
+              <div id="foreignTradeSummary" class="summary-list"></div>
+            </section>
+          </div>
+          <section class="panel section-gap">
+            <div class="panel-head">
+              <h2>Ultimas operaciones</h2>
+            </div>
+            <div class="table-wrap">
+              <table>
+                <thead>
+                  <tr><th>Fecha</th><th>Tipo</th><th>Contraparte</th><th>Documento</th><th>Moneda</th><th>TC</th><th>Total CLP</th></tr>
+                </thead>
+                <tbody id="foreignTradeRows"></tbody>
+              </table>
+            </div>
+          </section>
+        </section>
+
+        <section class="view" id="view-cashflow">
+          <section class="panel">
+            <div class="panel-head">
+              <h2>Flujo de caja proyectado</h2>
+              <span class="subtle">60 dias</span>
+            </div>
+            <div class="cashflow-chart" id="cashflowChart"></div>
+            <div class="table-wrap">
+              <table>
+                <thead>
+                  <tr>
+                    <th>Fecha</th>
+                    <th>Ingresos</th>
+                    <th>Egresos</th>
+                    <th>Saldo proyectado</th>
+                  </tr>
+                </thead>
+                <tbody id="cashflowRows"></tbody>
+              </table>
+            </div>
+          </section>
+        </section>
+
+        <section class="view" id="view-sii">
+          <div class="layout-two">
+            <section class="panel">
+              <div class="panel-head">
+                <h2>Conexion SII</h2>
+                <span class="status-pill" id="siiStatus">Pendiente</span>
+              </div>
+              <p class="copy">Hoy trabaja con importacion manual de archivos descargados desde el SII. Para bajar compras, ventas y facturas asociadas puede bastar un usuario autorizado con Clave Tributaria o Clave Unica; el certificado digital queda para emitir o firmar DTE.</p>
+              <button class="primary-button" id="syncSiiButton" data-tooltip="Registra una sincronizacion simulada. La conexion real queda pendiente hasta configurar usuario autorizado y manejo seguro de credenciales.">Sincronizar ahora</button>
+              <div class="import-box">
+                <div>
+                  <strong>Importar ventas SII</strong>
+                  <span>RCV ventas en CSV, TXT, XLSX o PDF</span>
+                </div>
+                <input id="siiSalesImportFile" type="file" accept=".csv,.txt,.xlsx,.pdf">
+                <button class="secondary-button" id="importSiiSalesButton" data-tooltip="Carga un archivo de ventas descargado desde el SII.">Importar</button>
+              </div>
+              <div class="import-box">
+                <div>
+                  <strong>Importar compras SII</strong>
+                  <span>RCV compras en CSV, TXT, XLSX o PDF</span>
+                </div>
+                <input id="siiPurchasesImportFile" type="file" accept=".csv,.txt,.xlsx,.pdf">
+                <button class="secondary-button" id="importSiiPurchasesButton" data-tooltip="Carga un archivo de compras descargado desde el SII.">Importar</button>
+              </div>
+            </section>
+            <section class="panel">
+              <div class="panel-head">
+                <h2>Ventas, costos e IVA mensual</h2>
+                <input id="ivaMonth" type="month">
+              </div>
+              <div id="ivaSummary" class="summary-list"></div>
+            </section>
+          </div>
+          <section class="panel section-gap">
+            <div class="panel-head">
+              <h2>Documentos SII importados</h2>
+            </div>
+            <div id="documentsSummary" class="summary-list"></div>
+          </section>
+        </section>
+
+        <section class="view" id="view-credits">
+          <div class="layout-two">
+          <section class="panel">
+            <div class="panel-head">
+              <h2>Creditos</h2>
+              <button class="secondary-button" data-open-form="credit" data-tooltip="Abre el formulario para ingresar un nuevo credito.">Agregar</button>
+            </div>
+            <div id="creditForm" class="form-grid hidden">
+              <input id="creditBank" placeholder="Banco">
+              <input id="creditName" placeholder="Nombre del credito">
+              <input id="creditAmount" type="number" placeholder="Monto original">
+              <input id="creditRate" type="number" step="0.01" placeholder="Tasa anual %">
+              <input id="creditDueDate" type="date">
+              <input id="creditInstallment" type="number" placeholder="Proxima cuota">
+              <button class="primary-button" id="addCreditButton" data-tooltip="Guarda el credito y su proxima cuota.">Guardar credito</button>
+            </div>
+            <div class="import-box">
+              <div>
+                <strong>Importar cuadro de desarrollo</strong>
+                <span>CSV, XLSX, TXT o PDF del banco</span>
+              </div>
+              <input id="creditImportFile" type="file" accept=".csv,.txt,.xlsx,.pdf">
+              <button class="secondary-button" id="importCreditButton" data-tooltip="Importa un cuadro de desarrollo desde archivo.">Importar</button>
+            </div>
+            <div id="creditsList" class="cards"></div>
+          </section>
+          <section class="panel">
+            <div class="panel-head">
+              <h2>Cuadro de desarrollo</h2>
+              <span class="subtle" id="creditDetailTitle">Selecciona un credito</span>
+            </div>
+            <div id="creditDetail" class="detail-empty">El detalle aparecera al apretar un credito.</div>
+          </section>
+          </div>
+        </section>
+
+        <section class="view" id="view-accounts">
+          <div class="layout-two">
+          <section class="panel">
+            <div class="panel-head">
+              <h2>Cuentas corrientes</h2>
+              <button class="secondary-button" data-open-form="account" data-tooltip="Abre el formulario para crear una cuenta corriente.">Agregar</button>
+            </div>
+            <div id="accountForm" class="form-grid hidden">
+              <input id="accountBank" placeholder="Banco">
+              <input id="accountName" placeholder="Nombre de cuenta">
+              <input id="accountNumber" placeholder="Numero">
+              <select id="accountCurrency">
+                <option value="CLP">CLP</option>
+                <option value="USD">USD</option>
+                <option value="EUR">EUR</option>
+                <option value="UF">UF</option>
+              </select>
+              <input id="accountBalance" type="number" placeholder="Saldo actual">
+              <input id="accountCreditLineLimit" type="number" placeholder="Linea credito aprobada">
+              <input id="accountCreditLineRate" type="number" step="0.01" placeholder="Tasa linea % anual">
+              <button class="primary-button" id="addAccountButton" data-tooltip="Guarda la cuenta con su moneda y saldo inicial.">Guardar cuenta</button>
+            </div>
+            <div class="bank-sync">
+              <label>
+                Hora sincronizacion diaria
+                <input id="bankSyncTime" type="time">
+              </label>
+              <button class="secondary-button" id="saveBankSyncTimeButton" data-tooltip="Guarda la hora diaria para revisar bancos mientras la app este abierta.">Guardar hora</button>
+              <button class="primary-button" id="syncBankButton" data-tooltip="Registra una sincronizacion bancaria. El conector real se agregara despues.">Sincronizar banco</button>
+            </div>
+            <div id="accountsList" class="cards"></div>
+          </section>
+          <section class="panel">
+            <div class="panel-head">
+              <h2>Movimientos</h2>
+              <span class="subtle" id="accountDetailTitle">Selecciona una cuenta</span>
+            </div>
+            <div class="import-box">
+              <div>
+                <strong>Importar cartola</strong>
+                <span>CSV, XLSX, TXT o PDF</span>
+              </div>
+              <input id="statementImportFile" type="file" accept=".csv,.txt,.xlsx,.pdf">
+              <button class="secondary-button" id="importStatementButton" data-tooltip="Importa movimientos de una cartola bancaria.">Importar</button>
+            </div>
+            <div id="accountDetail" class="detail-empty">Los movimientos apareceran al apretar una cuenta.</div>
+          </section>
+          </div>
+        </section>
+
+        <section class="view" id="view-cards">
+          <div class="layout-two">
+            <section class="panel">
+              <div class="panel-head">
+                <h2>Tarjetas de credito</h2>
+                <button class="secondary-button" data-open-form="card" data-tooltip="Abre el formulario para agregar una tarjeta de credito.">Agregar</button>
+              </div>
+              <div id="cardForm" class="form-grid hidden">
+                <input id="cardIssuer" placeholder="Banco o emisor">
+                <input id="cardName" placeholder="Nombre de tarjeta">
+                <input id="cardLast4" maxlength="4" placeholder="Ultimos 4 digitos">
+                <input id="cardPaymentDueDate" type="date">
+                <input id="cardCreditLimitClp" type="number" placeholder="Cupo CLP">
+                <input id="cardCreditLimitUsd" type="number" placeholder="Cupo USD">
+                <button class="primary-button" id="addCardButton" data-tooltip="Guarda la tarjeta con cupo CLP y USD.">Guardar tarjeta</button>
+              </div>
+              <div class="bank-sync">
+                <label>
+                  Hora descarga diaria
+                  <input id="cardSyncTime" type="time">
+                </label>
+                <button class="secondary-button" id="saveCardSyncTimeButton" data-tooltip="Guarda la hora diaria para revisar tarjetas mientras la app este abierta.">Guardar hora</button>
+                <button class="primary-button" id="syncCardsButton" data-tooltip="Registra una sincronizacion de tarjetas. El conector real se agregara despues.">Sincronizar tarjetas</button>
+              </div>
+              <div id="cardsList" class="cards"></div>
+            </section>
+            <section class="panel">
+              <div class="panel-head">
+                <h2>Movimientos tarjeta</h2>
+                <span class="subtle" id="cardDetailTitle">Selecciona una tarjeta</span>
+              </div>
+              <div id="cardMovementForm" class="form-grid">
+                <input id="cardMovementDate" type="date">
+                <input id="cardMovementMerchant" placeholder="Comercio o proveedor">
+                <input id="cardMovementDescription" placeholder="Detalle">
+                <input id="cardMovementAmount" type="number" placeholder="Monto">
+                <select id="cardMovementType">
+                  <option value="gasto">Gasto</option>
+                  <option value="costo">Costo</option>
+                </select>
+                <button class="primary-button" id="addCardMovementButton" data-tooltip="Agrega un movimiento pendiente a la tarjeta seleccionada.">Agregar movimiento</button>
+              </div>
+              <div id="cardDetail" class="detail-empty">Los movimientos apareceran al apretar una tarjeta.</div>
+            </section>
+          </div>
+        </section>
+
+        <section class="view" id="view-checks">
+          <div class="layout-two">
+            <section class="panel">
+              <div class="panel-head">
+                <h2>Cheques por cobrar</h2>
+                <button class="secondary-button" data-open-form="checkReceivable" data-tooltip="Abre el formulario para registrar un cheque por cobrar.">Agregar</button>
+              </div>
+              <div id="checkReceivableForm" class="form-grid hidden">
+                <input id="checkReceivableClient" placeholder="Cliente">
+                <input id="checkReceivableDetail" placeholder="Detalle">
+                <input id="checkReceivableDueDate" type="date">
+                <input id="checkReceivableAmount" type="number" placeholder="Monto">
+                <button class="primary-button" id="addCheckReceivableButton" data-tooltip="Guarda el cheque por cobrar y lo incorpora al flujo si tiene fecha.">Guardar cheque</button>
+              </div>
+              <div class="table-wrap"><table><tbody id="checksReceivableRows"></tbody></table></div>
+            </section>
+            <section class="panel">
+              <div class="panel-head">
+                <h2>Cheques por pagar</h2>
+                <button class="secondary-button" data-open-form="checkPayable" data-tooltip="Abre el formulario para registrar un cheque por pagar.">Agregar</button>
+              </div>
+              <div id="checkPayableForm" class="form-grid hidden">
+                <input id="checkPayableSupplier" placeholder="Proveedor">
+                <input id="checkPayableDetail" placeholder="Detalle">
+                <input id="checkPayableDueDate" type="date">
+                <input id="checkPayableAmount" type="number" placeholder="Monto">
+                <button class="primary-button" id="addCheckPayableButton" data-tooltip="Guarda el cheque por pagar y lo incorpora al flujo si tiene fecha.">Guardar cheque</button>
+              </div>
+              <div class="table-wrap"><table><tbody id="checksPayableRows"></tbody></table></div>
+            </section>
+          </div>
+        </section>
+
+        <section class="view" id="view-investments">
+          <div class="layout-two">
+            <section class="panel">
+              <div class="panel-head">
+                <h2>Inversiones</h2>
+                <button class="secondary-button" data-open-form="investment" data-tooltip="Abre el formulario para registrar un deposito, pacto o fondo mutuo.">Agregar</button>
+              </div>
+              <div id="investmentForm" class="form-grid hidden">
+                <select id="investmentType">
+                  <option value="deposito_plazo">Deposito a plazo</option>
+                  <option value="pacto">Pacto</option>
+                  <option value="fondo_mutuo">Fondo mutuo</option>
+                </select>
+                <input id="investmentInstitution" placeholder="Banco o institucion">
+                <input id="investmentName" placeholder="Nombre de inversion">
+                <select id="investmentCurrency">
+                  <option value="CLP">CLP</option>
+                  <option value="USD">USD</option>
+                  <option value="EUR">EUR</option>
+                  <option value="UF">UF</option>
+                </select>
+                <input id="investmentAmount" type="number" placeholder="Monto invertido">
+                <input id="investmentStartDate" type="date">
+                <input id="investmentDays" type="number" placeholder="Dias/plazo">
+                <input id="investmentRate" type="number" step="0.01" placeholder="Interes %">
+                <select id="investmentRateType" data-tooltip="Para DAP o pactos, la tasa puede venir mensual a 30 dias o anual.">
+                  <option value="30d">Tasa 30 dias</option>
+                  <option value="annual">Tasa anual</option>
+                </select>
+                <input id="investmentCurrentValue" type="number" placeholder="Valor actual opcional">
+                <select id="investmentFundingAccount" data-tooltip="Cuenta desde donde sale la plata al tomar la inversion."></select>
+                <button class="primary-button" id="addInvestmentButton" data-tooltip="Guarda la inversion, descuenta la plata de caja y proyecta su vencimiento. El abono real se hace al liquidar y elegir la cuenta destino.">Guardar inversion</button>
+              </div>
+              <div id="investmentsList" class="cards"></div>
+            </section>
+            <section class="panel">
+              <div class="panel-head">
+                <h2>Detalle inversion</h2>
+                <span class="subtle" id="investmentDetailTitle">Selecciona una inversion</span>
+              </div>
+              <div id="investmentDetail" class="detail-empty">El detalle aparecera al apretar una inversion.</div>
+            </section>
+          </div>
+        </section>
+
+        <section class="view" id="view-receivables">
+          <section class="panel">
+            <div class="panel-head">
+              <h2>Cuentas por cobrar</h2>
+              <button class="secondary-button" data-open-form="receivable" data-tooltip="Abre el formulario para agregar una cuenta por cobrar.">Agregar</button>
+            </div>
+            <div id="receivableForm" class="form-grid hidden">
+              <input id="receivableCustomer" placeholder="Cliente">
+              <input id="receivableItem" placeholder="Item, ej: Ventas">
+              <input id="receivableDocument" placeholder="Documento">
+              <input id="receivableDueDate" type="date">
+              <input id="receivableAmount" type="number" placeholder="Monto">
+              <button class="primary-button" id="addReceivableButton" data-tooltip="Guarda una cuenta por cobrar pendiente.">Guardar cobro</button>
+            </div>
+            <div class="table-wrap">
+              <table>
+                <thead>
+                  <tr>
+                    <th>Cliente</th>
+                    <th>Item</th>
+                    <th>Monto</th>
+                    <th>Plazo total</th>
+                    <th>Fecha de pago</th>
+                    <th>Estado</th>
+                    <th>Accion</th>
+                  </tr>
+                </thead>
+                <tbody id="receivablesRows"></tbody>
+              </table>
+            </div>
+          </section>
+        </section>
+
+        <section class="view" id="view-payables">
+          <section class="panel">
+            <div class="panel-head">
+              <h2>Cuentas por pagar</h2>
+              <button class="secondary-button" data-open-form="payable" data-tooltip="Abre el formulario para agregar una cuenta por pagar.">Agregar</button>
+            </div>
+            <div id="payableForm" class="form-grid hidden">
+              <input id="payableSupplier" placeholder="Proveedor">
+              <input id="payableItem" placeholder="Item, ej: Luz, agua, gas, materia prima">
+              <input id="payableDocument" placeholder="Documento">
+              <input id="payableDueDate" type="date">
+              <input id="payableAmount" type="number" placeholder="Monto">
+              <button class="primary-button" id="addPayableButton" data-tooltip="Guarda una cuenta por pagar pendiente.">Guardar pago</button>
+            </div>
+            <div class="table-wrap">
+              <table>
+                <thead>
+                  <tr>
+                    <th>Destinatario</th>
+                    <th>Item</th>
+                    <th>Monto</th>
+                    <th>Plazo total</th>
+                    <th>Fecha de pago</th>
+                    <th>Estado</th>
+                    <th>Accion</th>
+                  </tr>
+                </thead>
+                <tbody id="payablesRows"></tbody>
+              </table>
+            </div>
+          </section>
+        </section>
+
+        <section class="view" id="view-reports">
+          <section class="panel no-print">
+            <div class="panel-head">
+              <h2>Reportes imprimibles</h2>
+              <button class="primary-button" id="printReportButton" data-tooltip="Imprime o guarda como PDF el reporte visible.">Imprimir reporte</button>
+            </div>
+            <div class="form-grid">
+              <select id="reportType">
+                <option value="daily">Financiero diario</option>
+                <option value="cashflow">Flujo de caja 60 dias</option>
+                <option value="eerr">EERR mensual</option>
+                <option value="sales">Ventas por cliente</option>
+              </select>
+              <select id="reportLanguage">
+                <option value="es">Español</option>
+                <option value="pt">Português</option>
+                <option value="en">English</option>
+              </select>
+              <select id="reportCurrency">
+                <option value="CLP">CLP</option>
+                <option value="USD">USD</option>
+                <option value="EUR">EUR</option>
+                <option value="UF">UF</option>
+              </select>
+              <button class="secondary-button" id="refreshReportButton" data-tooltip="Actualiza la vista previa con la moneda e idioma seleccionados.">Actualizar vista</button>
+            </div>
+          </section>
+          <section class="report-page" id="reportPreview"></section>
+        </section>
+      </main>
+    </div>
+
+    <script src="app.js" type="module"></script>
+  </body>
+</html>

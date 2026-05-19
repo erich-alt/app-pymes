@@ -1,0 +1,252 @@
+{
+  "company": {
+    "name": "Empresa de ejemplo SpA",
+    "rut": "76.123.456-7",
+    "currency": "CLP"
+  },
+  "settings": {
+    "cashflowDays": 60,
+    "lastSiiSync": null,
+    "lastBankSync": null,
+    "bankSyncTime": "08:30",
+    "lastCardSync": null,
+    "lastDailyRun": null,
+    "cardSyncTime": "08:45",
+    "economicIndicators": {
+      "uf": 39000,
+      "usd": 950,
+      "eur": 1030,
+      "utm": 68000,
+      "source": "referencial",
+      "updatedAt": null
+    }
+  },
+  "bankAccounts": [
+    {
+      "id": "bank-1",
+      "bank": "Banco de Chile",
+      "name": "Cuenta corriente principal",
+      "number": "000-000-001",
+      "currency": "CLP",
+      "balance": 5500000,
+      "movements": [
+        {
+          "id": "mov-inv-1",
+          "date": "2026-05-10",
+          "description": "Toma inversion DAP capital disponible",
+          "document": "Deposito a plazo",
+          "amount": -3000000,
+          "balance": 5500000,
+          "source": "inversion",
+          "matchedTo": null
+        },
+        {
+          "id": "mov-1",
+          "date": "2026-05-06",
+          "description": "Saldo inicial",
+          "document": "",
+          "amount": 0,
+          "balance": 8500000,
+          "source": "manual",
+          "matchedTo": null
+        }
+      ]
+    },
+    {
+      "id": "bank-2",
+      "bank": "Banco Estado",
+      "name": "Cuenta gastos",
+      "number": "000-000-002",
+      "currency": "CLP",
+      "balance": 2300000,
+      "movements": []
+    }
+  ],
+  "checksReceivable": [
+    {
+      "id": "chk-in-1",
+      "client": "Cliente Norte SpA",
+      "detail": "Cheque recibido por anticipo",
+      "dueDate": "2026-05-28",
+      "amount": 950000,
+      "status": "pendiente"
+    }
+  ],
+  "checksPayable": [
+    {
+      "id": "chk-out-1",
+      "supplier": "Proveedor Servicios TI",
+      "detail": "Cheque entregado",
+      "dueDate": "",
+      "amount": 480000,
+      "status": "pendiente"
+    }
+  ],
+  "creditCards": [
+    {
+      "id": "card-1",
+      "issuer": "Banco de Chile",
+      "name": "Visa Empresas",
+      "last4": "1234",
+      "creditLimitClp": 5000000,
+      "creditLimitUsd": 3000,
+      "paymentDueDate": "2026-06-10",
+      "lastSync": null,
+      "movements": [
+        {
+          "id": "card-mov-1",
+          "date": "2026-05-07",
+          "merchant": "Proveedor Insumos",
+          "description": "Compra materiales",
+          "amount": 420000,
+          "classification": "costo",
+          "status": "pendiente"
+        },
+        {
+          "id": "card-mov-2",
+          "date": "2026-05-08",
+          "merchant": "Software mensual",
+          "description": "Suscripcion operacional",
+          "amount": 89000,
+          "classification": "gasto",
+          "status": "pendiente"
+        }
+      ]
+    }
+  ],
+  "investments": [
+    {
+      "id": "inv-1",
+      "type": "deposito_plazo",
+      "institution": "Banco de Chile",
+      "name": "DAP capital disponible",
+      "currency": "CLP",
+      "amount": 3000000,
+      "startDate": "2026-05-10",
+      "days": 30,
+      "rate": 0.65,
+      "rateType": "30d",
+      "currentValue": 0,
+      "fundingAccountId": "bank-1",
+      "rescueAccountId": "bank-1",
+      "cashOutPosted": true,
+      "cashInPosted": false,
+      "status": "activa"
+    }
+  ],
+  "receivables": [
+    {
+      "id": "ar-1",
+      "customer": "Cliente Norte SpA",
+      "document": "Factura 1051",
+      "item": "Ventas",
+      "issueDate": "2026-05-02",
+      "dueDate": "2026-05-20",
+      "amount": 2400000,
+      "status": "pendiente"
+    },
+    {
+      "id": "ar-2",
+      "customer": "Comercial Las Condes Ltda.",
+      "document": "Factura 1052",
+      "item": "Ventas",
+      "issueDate": "2026-05-05",
+      "dueDate": "2026-06-05",
+      "amount": 3900000,
+      "status": "pendiente"
+    }
+  ],
+  "payables": [
+    {
+      "id": "ap-1",
+      "supplier": "Proveedor Servicios TI",
+      "document": "Factura 889",
+      "item": "Materia prima",
+      "issueDate": "2026-05-04",
+      "dueDate": "2026-05-18",
+      "amount": 760000,
+      "status": "pendiente"
+    },
+    {
+      "id": "ap-2",
+      "supplier": "Arriendo Oficina",
+      "document": "Arriendo mayo",
+      "item": "Arriendo",
+      "issueDate": "2026-05-01",
+      "dueDate": "2026-05-30",
+      "amount": 1200000,
+      "status": "pendiente"
+    }
+  ],
+  "credits": [
+    {
+      "id": "credit-1",
+      "bank": "Banco Santander",
+      "name": "Credito capital de trabajo",
+      "principal": 18000000,
+      "annualRate": 13.2,
+      "startDate": "2026-04-15",
+      "installments": [
+        {
+          "number": 1,
+          "dueDate": "2026-05-15",
+          "amount": 1650000,
+          "interest": 198000,
+          "principal": 1452000,
+          "status": "pendiente"
+        },
+        {
+          "number": 2,
+          "dueDate": "2026-06-15",
+          "amount": 1650000,
+          "interest": 182028,
+          "principal": 1467972,
+          "status": "pendiente"
+        },
+        {
+          "number": 3,
+          "dueDate": "2026-07-15",
+          "amount": 1650000,
+          "interest": 165880,
+          "principal": 1484120,
+          "status": "pendiente"
+        }
+      ]
+    }
+  ],
+  "documents": {
+    "sales": [
+      {
+        "id": "sale-1",
+        "type": "Factura electronica",
+        "folio": "1051",
+        "counterparty": "Cliente Norte SpA",
+        "date": "2026-05-02",
+        "net": 2016807,
+        "tax": 383193,
+        "total": 2400000,
+        "source": "manual"
+      }
+    ],
+    "purchases": [
+      {
+        "id": "purchase-1",
+        "type": "Factura electronica",
+        "folio": "889",
+        "counterparty": "Proveedor Servicios TI",
+        "date": "2026-05-04",
+        "net": 638655,
+        "tax": 121345,
+        "total": 760000,
+        "source": "manual"
+      }
+    ]
+  },
+  "activityLog": [
+    {
+      "id": "log-1",
+      "date": "2026-05-08T09:00:00.000Z",
+      "message": "Base inicial creada con datos de ejemplo."
+    }
+  ]
+}
