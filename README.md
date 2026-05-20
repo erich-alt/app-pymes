@@ -93,4 +93,4 @@ Ese archivo se crea automaticamente la primera vez que se inicia la app.
 - PDF: se intenta leer el texto del documento. Algunos bancos generan PDF escaneados como imagen; esos requeriran OCR en una etapa posterior.
 - La sincronizacion bancaria puede usar Fintoc si se configuran `FINTOC_SECRET_KEY` y `FINTOC_PUBLIC_KEY` en `.env`.
 - La sincronizacion de tarjetas actual registra la descarga en la app, pero no descarga movimientos reales hasta configurar conectores por banco/emisor.
-- La version GitHub Pages es estatica: sirve para revisar, trabajar con datos de ejemplo y actualizar indicadores economicos desde el navegador. Fintoc real requiere la app local o un backend seguro. Ver `docs/FINTOC-CONEXION.md`.
+- La version GitHub Pages es estatica: sirve para revisar, trabajar con datos de ejemplo, actualizar indicadores economicos desde el navegador y guardar llaves de prueba en el navegador. Fintoc real requiere la app local o un backend seguro. Ver `docs/FINTOC-CONEXION.md`.

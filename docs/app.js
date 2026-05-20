@@ -170,6 +170,12 @@ function id(prefix) {
   return `${prefix}-${Date.now()}-${Math.random().toString(16).slice(2, 8)}`;
 }
 
+function apiUrl(path) {
+  const base = state?.settings?.fintocOnlineConfig?.backendUrl || "";
+  if (!base) return path;
+  return `${base.replace(/\/$/, "")}${path}`;
+}
+
 function defaultCompanyData(name = "Nueva empresa", rut = "") {
   return {
     company: { name, rut, currency: "CLP" },
@@ -183,6 +189,12 @@ function defaultCompanyData(name = "Nueva empresa", rut = "") {
       lastSiiSync: null,
       fintocLinks: [],
       fintocLastError: "",
+      fintocOnlineConfig: {
+        backendUrl: "",
+        publicKey: "",
+        bankKey: "",
+        siiKey: ""
+      },
       economicIndicators: state?.settings?.economicIndicators || {
         uf: 39000,
         usd: 950,
@@ -362,6 +374,15 @@ function cleanRut(value) {
   return String(value || "").replace(/[^0-9kK]/g, "");
 }
 
+function fintocRequestHeaders(product) {
+  const config = state?.settings?.fintocOnlineConfig || {};
+  const key = product === "invoices" ? config.siiKey : config.bankKey;
+  const headers = { "Content-Type": "application/json" };
+  if (config.publicKey) headers["X-Fintoc-Public-Key"] = config.publicKey;
+  if (key && config.backendUrl) headers["X-Fintoc-Key"] = key;
+  return headers;
+}
+
 function flowDate(value) {
   const parsed = parseDate(value);
   if (!parsed) return "";
@@ -482,6 +503,12 @@ function migrateState() {
     lastSiiSync: null,
     fintocLinks: [],
     fintocLastError: "",
+    fintocOnlineConfig: {
+      backendUrl: "",
+      publicKey: "",
+      bankKey: "",
+      siiKey: ""
+    },
     economicIndicators: {
       uf: 39000,
       usd: 950,
@@ -495,6 +522,10 @@ function migrateState() {
   state.settings = {
     ...state.settings,
     ...incomingSettings,
+    fintocOnlineConfig: {
+      ...(state.settings.fintocOnlineConfig || {}),
+      ...(incomingSettings.fintocOnlineConfig || {})
+    },
     economicIndicators: {
       ...(state.settings.economicIndicators || {}),
       ...(incomingSettings.economicIndicators || {})
@@ -783,7 +814,7 @@ function showNotice(message) {
 
 async function loadState() {
   try {
-    const response = await fetch("/api/state");
+    const response = await fetch(apiUrl("/api/state"));
     if (!response.ok) throw new Error("Sin API local");
     state = await response.json();
   } catch {
@@ -807,7 +838,7 @@ async function loadState() {
 async function saveState(message = "Datos guardados.") {
   persistActiveCompanyData();
   try {
-    const response = await fetch("/api/state", {
+    const response = await fetch(apiUrl("/api/state"), {
       method: "PUT",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify(state)
@@ -841,6 +872,39 @@ function renderEconomicIndicators() {
     <button class="secondary-button" id="syncIndicatorsButton">Actualizar</button>
   `;
   $("#syncIndicatorsButton").addEventListener("click", syncIndicators);
+}
+
+function renderOnlineConfig() {
+  const indicators = state.settings.economicIndicators || {};
+  const config = state.settings.fintocOnlineConfig || {};
+  $("#indicatorUsdInput").value = indicators.usd || "";
+  $("#indicatorEurInput").value = indicators.eur || "";
+  $("#indicatorUfInput").value = indicators.uf || "";
+  $("#indicatorUtmInput").value = indicators.utm || "";
+  $("#fintocBackendUrlInput").value = config.backendUrl || "";
+  $("#fintocPublicKeyInput").value = config.publicKey || "";
+  $("#fintocBankKeyInput").value = config.bankKey || "";
+  $("#fintocSiiKeyInput").value = config.siiKey || "";
+}
+
+async function saveOnlineConfig() {
+  state.settings.economicIndicators = {
+    ...(state.settings.economicIndicators || {}),
+    usd: Number($("#indicatorUsdInput").value || 0),
+    eur: Number($("#indicatorEurInput").value || 0),
+    uf: Number($("#indicatorUfInput").value || 0),
+    utm: Number($("#indicatorUtmInput").value || 0),
+    source: "manual",
+    updatedAt: new Date().toISOString()
+  };
+  state.settings.fintocOnlineConfig = {
+    backendUrl: $("#fintocBackendUrlInput").value.trim(),
+    publicKey: $("#fintocPublicKeyInput").value.trim(),
+    bankKey: $("#fintocBankKeyInput").value.trim(),
+    siiKey: $("#fintocSiiKeyInput").value.trim()
+  };
+  addLog("Configuracion online actualizada.");
+  await saveState("Configuracion online guardada.");
 }
 
 function renderMetrics() {
@@ -1932,6 +1996,7 @@ function render() {
   $("#companyRut").textContent = state.company.rut;
   renderCompanySwitcher();
   renderEconomicIndicators();
+  renderOnlineConfig();
   renderDailyStatus();
   renderFintocPanel();
   renderMetrics();
@@ -2258,7 +2323,7 @@ async function uploadFile(endpoint, input) {
   const form = new FormData();
   form.append("file", file);
   try {
-    const response = await fetch(endpoint, { method: "POST", body: form });
+    const response = await fetch(apiUrl(endpoint), { method: "POST", body: form });
     if (!response.ok) throw new Error("No se pudo importar el archivo.");
     return response.json();
   } catch {
@@ -2493,6 +2558,7 @@ async function importSiiDocuments(direction, input) {
 function bindActions() {
   $("#saveButton").addEventListener("click", () => saveState());
   $("#refreshButton").addEventListener("click", () => loadState());
+  $("#saveOnlineConfigButton").addEventListener("click", saveOnlineConfig);
 
   $("#companySelect").addEventListener("change", async (event) => {
     persistActiveCompanyData();
@@ -2569,7 +2635,7 @@ function bindActions() {
 
 async function syncIndicators() {
   try {
-    const response = await fetch("/api/indicators/sync", { method: "POST" });
+    const response = await fetch(apiUrl("/api/indicators/sync"), { method: "POST" });
     if (!response.ok) throw new Error("No se pudieron actualizar los indicadores.");
     state = await response.json();
     migrateState();
@@ -2601,9 +2667,9 @@ async function connectFintoc(product) {
     if (!window.Fintoc) {
       throw new Error("No se pudo cargar el widget de Fintoc. Revisa internet y vuelve a intentar.");
     }
-    const response = await fetch("/api/fintoc/link-intent", {
+    const response = await fetch(apiUrl("/api/fintoc/link-intent"), {
       method: "POST",
-      headers: { "Content-Type": "application/json" },
+      headers: fintocRequestHeaders(product),
       body: JSON.stringify({ product, companyId: state.activeCompanyId })
     });
     if (!response.ok) {
@@ -2621,9 +2687,9 @@ async function connectFintoc(product) {
       onSuccess: async (linkIntent) => {
         const exchangeToken = linkIntent.exchangeToken || linkIntent.exchange_token;
         const linkToken = linkIntent.linkToken || linkIntent.link_token;
-        const exchangeResponse = await fetch("/api/fintoc/exchange", {
+        const exchangeResponse = await fetch(apiUrl("/api/fintoc/exchange"), {
           method: "POST",
-          headers: { "Content-Type": "application/json" },
+          headers: fintocRequestHeaders(product),
           body: JSON.stringify({
             product,
             exchangeToken,
@@ -2650,7 +2716,7 @@ async function connectFintoc(product) {
 
 async function syncBank() {
   try {
-    const response = await fetch("/api/bank/sync", { method: "POST" });
+    const response = await fetch(apiUrl("/api/bank/sync"), { method: "POST", headers: fintocRequestHeaders("movements") });
     if (!response.ok) {
       const error = await response.json().catch(() => ({}));
       throw new Error(error.error || error.message || "No se pudo sincronizar bancos.");
@@ -2668,7 +2734,7 @@ async function syncBank() {
 
 async function syncSii() {
   try {
-    const response = await fetch("/api/sii/sync", { method: "POST" });
+    const response = await fetch(apiUrl("/api/sii/sync"), { method: "POST", headers: fintocRequestHeaders("invoices") });
     if (!response.ok) {
       const error = await response.json().catch(() => ({}));
       throw new Error(error.error || error.message || "No se pudo sincronizar SII.");

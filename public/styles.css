@@ -275,6 +275,47 @@ h2 {
   box-shadow: var(--shadow);
 }
 
+.online-config {
+  margin-bottom: 18px;
+  padding: 16px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: var(--surface);
+  box-shadow: var(--shadow);
+}
+
+.online-config-grid {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(150px, 1fr));
+  gap: 10px;
+}
+
+.online-config-grid label {
+  display: grid;
+  gap: 6px;
+  color: var(--muted);
+  font-size: 12px;
+  font-weight: 700;
+  text-transform: uppercase;
+}
+
+.online-config-grid input {
+  width: 100%;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  min-height: 40px;
+  padding: 0 12px;
+  color: var(--ink);
+  font-weight: 400;
+  text-transform: none;
+}
+
+.config-note {
+  margin: 12px 0 0;
+  color: var(--muted);
+  font-size: 13px;
+}
+
 .fintoc-grid {
   display: grid;
   grid-template-columns: repeat(4, minmax(160px, 1fr));
@@ -819,6 +860,7 @@ th {
   .indicator-strip,
   .daily-grid,
   .fintoc-grid,
+  .online-config-grid,
   .layout-two,
   .form-grid,
   .filter-bar,

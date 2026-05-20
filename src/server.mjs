@@ -64,19 +64,22 @@ function sendJson(res, status, payload) {
 }
 
 function requireFintocConfig() {
-  if (!process.env.FINTOC_SECRET_KEY || !process.env.FINTOC_PUBLIC_KEY) {
+  const requestKey = globalThis.currentFintocRequestKey;
+  const requestPublicKey = globalThis.currentFintocPublicKey;
+  if (!(process.env.FINTOC_SECRET_KEY || requestKey) || !(process.env.FINTOC_PUBLIC_KEY || requestPublicKey)) {
     throw new Error("Falta configurar FINTOC_SECRET_KEY y FINTOC_PUBLIC_KEY en .env.");
   }
 }
 
 async function fintocRequest(pathname, options = {}) {
   requireFintocConfig();
+  const secretKey = globalThis.currentFintocRequestKey || process.env.FINTOC_SECRET_KEY;
   const response = await fetch(`${fintocBaseUrl}${pathname}`, {
     ...options,
     headers: {
       "Accept": "application/json",
       "Content-Type": "application/json",
-      "Authorization": process.env.FINTOC_SECRET_KEY,
+      "Authorization": secretKey,
       ...(options.headers || {})
     }
   });
@@ -517,6 +520,9 @@ async function writeState(state) {
 }
 
 async function handleApi(req, res, url) {
+  globalThis.currentFintocRequestKey = req.headers["x-fintoc-key"] || "";
+  globalThis.currentFintocPublicKey = req.headers["x-fintoc-public-key"] || "";
+
   if (req.method === "GET" && url.pathname === "/api/state") {
     sendJson(res, 200, await readState());
     return true;
@@ -532,8 +538,8 @@ async function handleApi(req, res, url) {
       lastSync: link.lastSync
     }));
     sendJson(res, 200, {
-      configured: Boolean(process.env.FINTOC_SECRET_KEY && process.env.FINTOC_PUBLIC_KEY),
-      publicKey: process.env.FINTOC_PUBLIC_KEY || "",
+      configured: Boolean((process.env.FINTOC_SECRET_KEY || globalThis.currentFintocRequestKey) && (process.env.FINTOC_PUBLIC_KEY || globalThis.currentFintocPublicKey)),
+      publicKey: process.env.FINTOC_PUBLIC_KEY || globalThis.currentFintocPublicKey || "",
       links,
       lastError: state.settings.fintocLastError || ""
     });
@@ -553,7 +559,7 @@ async function handleApi(req, res, url) {
       body: JSON.stringify(payload)
     });
     sendJson(res, 201, {
-      publicKey: process.env.FINTOC_PUBLIC_KEY,
+      publicKey: process.env.FINTOC_PUBLIC_KEY || globalThis.currentFintocPublicKey,
       product,
       country: "cl",
       holderType: "business",
@@ -626,7 +632,7 @@ async function handleApi(req, res, url) {
   if (req.method === "POST" && url.pathname === "/api/sii/sync") {
     const state = await readState();
     const links = ensureFintocSettings(state).filter((link) => link.product === "invoices" && link.linkToken);
-    if (process.env.FINTOC_SECRET_KEY && process.env.FINTOC_PUBLIC_KEY && links.length) {
+    if ((process.env.FINTOC_SECRET_KEY || globalThis.currentFintocRequestKey) && (process.env.FINTOC_PUBLIC_KEY || globalThis.currentFintocPublicKey) && links.length) {
       const since = url.searchParams.get("since") || `${new Date().getFullYear()}-01-01`;
       const until = url.searchParams.get("until") || "";
       let salesAdded = 0;
@@ -668,7 +674,7 @@ async function handleApi(req, res, url) {
   if (req.method === "POST" && url.pathname === "/api/bank/sync") {
     const state = await readState();
     const links = bankSyncSources(state);
-    if (process.env.FINTOC_SECRET_KEY && process.env.FINTOC_PUBLIC_KEY && links.length) {
+    if ((process.env.FINTOC_SECRET_KEY || globalThis.currentFintocRequestKey) && (process.env.FINTOC_PUBLIC_KEY || globalThis.currentFintocPublicKey) && links.length) {
       let newMovements = 0;
       const mfa = [];
       for (const link of links) {

@@ -55,6 +55,26 @@
 
         <section class="view active" id="view-dashboard">
           <div class="indicator-strip" id="economicIndicators"></div>
+          <section class="online-config">
+            <div class="panel-head">
+              <div>
+                <p class="eyebrow">Valores y conexiones</p>
+                <h2>Configuracion online</h2>
+              </div>
+              <button class="secondary-button" id="saveOnlineConfigButton" data-tooltip="Guarda indicadores y llaves solo en este navegador.">Guardar configuracion</button>
+            </div>
+            <div class="online-config-grid">
+              <label>USD<input id="indicatorUsdInput" type="number" step="0.01"></label>
+              <label>EUR<input id="indicatorEurInput" type="number" step="0.01"></label>
+              <label>UF<input id="indicatorUfInput" type="number" step="0.01"></label>
+              <label>UTM<input id="indicatorUtmInput" type="number" step="0.01"></label>
+              <label>Backend seguro<input id="fintocBackendUrlInput" placeholder="https://tu-backend.com"></label>
+              <label>Llave publica Fintoc<input id="fintocPublicKeyInput" placeholder="pk_live..."></label>
+              <label>Llave bancos<input id="fintocBankKeyInput" type="password" placeholder="sk_live..."></label>
+              <label>Llave SII<input id="fintocSiiKeyInput" type="password" placeholder="sk_live..."></label>
+            </div>
+            <p class="config-note">En GitHub Pages estas llaves quedan solo en tu navegador. Para descargar bancos o SII de verdad se usaran mediante un backend seguro.</p>
+          </section>
           <section class="daily-center">
             <div class="daily-head">
               <div>

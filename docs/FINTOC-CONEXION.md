@@ -34,4 +34,6 @@ Estos documentos alimentan ventas, compras, IVA, cuentas por cobrar y cuentas po
 
 ## Limitacion de GitHub Pages
 
-La version publicada en GitHub Pages es estatica y no puede guardar claves secretas ni llamar Fintoc directamente. Sirve para revisar la interfaz, guardar datos de prueba en el navegador y actualizar indicadores economicos desde internet. Para sincronizacion real de bancos y SII se debe usar la app local o desplegar un backend con HTTPS.
+La version publicada en GitHub Pages es estatica. Sirve para revisar la interfaz, guardar datos de prueba en el navegador, actualizar indicadores economicos desde internet y registrar llaves de prueba por navegador.
+
+Para sincronizacion real de bancos y SII se debe usar la app local o desplegar un backend con HTTPS. Si se configura `Backend seguro` en el dashboard, la app online llamara ese backend y enviara las llaves en headers para pruebas controladas. No se recomienda usar llaves productivas directamente desde GitHub Pages.
